@@ -34,16 +34,17 @@ const validatePayment = async (req, res, next) => {
   try {
     const { razorpay_order_id, razorpay_payment_id } = req.body;
     let data = await razorpay.payments.fetch(razorpay_payment_id);
-    const { amount, status } = data;
+    const { status } = data;
 
     const transaction = await Transaction.findOne({
       where: { orderId: razorpay_order_id },
     });
-
     if (!transaction) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Transaction not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Transaction not found",
+        paymentSuccess: false,
+      });
     }
     if (status === "captured") {
       await transaction.update({ status: "Success" });
@@ -52,6 +53,7 @@ const validatePayment = async (req, res, next) => {
       success: true,
       message: "payment-successful",
       data: transaction,
+      paymentSuccess: true,
     });
   } catch (error) {
     console.log(error.message);
