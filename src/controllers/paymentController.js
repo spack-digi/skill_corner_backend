@@ -6,10 +6,30 @@ const {
 } = require("../utils/mailTemplates");
 const { sendMail } = require("../utils/nodemailer");
 const envVars = require("../config/envVars");
+const { Op } = require("sequelize");
 
 const CreateOrder = async (req, res, next) => {
   try {
     let { amount, currency, email, mobile, name } = req.body;
+
+    const transExists = await Transaction.findOne({
+      where: {
+        email,
+        createdAt: {
+          [Op.gt]: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
+        },
+        status: "Success",
+      },
+    });
+
+    if (transExists) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "You have already made a successful transaction in the last hour. Please wait before making another transaction.",
+      });
+    }
+
     const order = await razorpay.orders.create({
       amount: amount,
       currency: currency,
@@ -24,6 +44,7 @@ const CreateOrder = async (req, res, next) => {
       email,
       mobile,
     });
+
     res.status(200).json({
       success: true,
       message: "Order Created successfully",
