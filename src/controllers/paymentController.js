@@ -1,5 +1,11 @@
 const razorpay = require("../utils/razorpay");
 const { Transaction } = require("../models");
+const {
+  userMailTemplate,
+  adminMailTemplate,
+} = require("../utils/mailTemplates");
+const { sendMail } = require("../utils/nodemailer");
+const envVars = require("../config/envVars");
 
 const CreateOrder = async (req, res, next) => {
   try {
@@ -47,7 +53,10 @@ const validatePayment = async (req, res, next) => {
       });
     }
     if (status === "captured") {
-      await transaction.update({ status: "Success" });
+      await transaction.update({
+        status: "Success",
+        paymentId: razorpay_payment_id,
+      });
     }
     res.status(200).json({
       success: true,
@@ -80,37 +89,68 @@ const refundInitiate = async (req, res, next) => {
 
 const paymentWebHook = async (req, res, next) => {
   try {
-    const secret = "your_webhook_secret";
-    const signature = req.headers["x-razorpay-signature"];
-    const body = JSON.stringify(req.body);
+    const event = req.body.event;
+    const payload = req.body.payload;
 
-    const expectedSignature = crypto
-      .createHmac("sha256", secret)
-      .update(body)
-      .digest("hex");
-
-    if (signature === expectedSignature) {
-      const event = req.body.event;
-      const payload = req.body.payload;
-
-      switch (event) {
-        case "payment.captured":
-          // TODO: Send Email of payment success to Customer
-          console.log("Payment captured:", payload);
-          break;
-        case "order.paid":
-          console.log("Order paid:", payload);
-          break;
-        default:
-          console.log("Unhandled event:", event);
+    switch (event) {
+      case "payment.captured":
+        // TODO: Send Email of payment success to Customer
+        console.log("Payment captured:", payload);
+        break;
+      case "order.paid": {
+        let payment = payload.payment.entity;
+        console.log("Order paid:", payload);
+        let trans = await Transaction.findOne({
+          where: { orderId: payment.order_id },
+        });
+        if (!trans) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Transaction not found" });
+        }
+        if (payment.status === "captured") {
+          await trans.update({
+            status: "Success",
+            paymentId: payment.id,
+          });
+          let template = userMailTemplate(trans.name);
+          let mailOptions = {
+            to: trans.email,
+            subject:
+              "Your Registration for Skill Corner's Prompt Engineering Demo is Successful!",
+            html: template,
+          };
+          await sendMail(mailOptions);
+          let adminTemplate = adminMailTemplate(
+            trans.name,
+            trans.email,
+            trans.mobile
+          );
+          let adminMailOptions = {
+            to: envVars.adminMail,
+            subject: "New Registration Alert – Prompt Engineering Demo Class",
+            html: adminTemplate,
+          };
+          await sendMail(adminMailOptions);
+          return res.status(200).json({
+            success: true,
+            message: "Payment successful",
+            data: trans,
+          });
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: "Payment Failed",
+            data: trans,
+          });
+        }
       }
-
-      res
-        .status(200)
-        .json({ success: true, message: "Webhook processed successfully" });
-    } else {
-      res.status(400).json({ success: false, message: "Invalid signature" });
+      default:
+        console.log("Unhandled event:", event);
     }
+    res
+      .status(200)
+      .json({ success: true, message: "Webhook processed successfully" });
   } catch (error) {
     console.log(error.message);
     next(error);

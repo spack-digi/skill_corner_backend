@@ -16,9 +16,9 @@ app.use(
   })
 );
 
+app.post("/v1/payment-webhook", paymentController.paymentWebHook);
 app.use("/v1", router);
 app.use(errorHandler);
-app.post("/v1/payment-webhook", paymentController.paymentWebHook);
 
 app.get("/", (req, res) => {
   res.send("Hello World!");

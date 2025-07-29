@@ -5,4 +5,5 @@ module.exports = {
   razorpaySecretKey: process.env.RAZORPAY_SECRET_KEY,
   mail: process.env.MAIL,
   mailPassword: process.env.MAIL_PASS,
+  adminMail: process.env.ADMIN_MAIL,
 };

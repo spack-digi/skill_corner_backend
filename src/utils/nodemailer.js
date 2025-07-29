@@ -1,6 +1,8 @@
 const nodemailer = require("nodemailer");
 const envConfig = require("../config/envVars");
 
+
+console.log("envConfig", envConfig);
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -11,7 +13,7 @@ const transporter = nodemailer.createTransport({
 
 function sendMail(mailOptions) {
   return transporter.sendMail({
-    from: process.env.GMAIL_USER,
+    from: '"Skill Corner" <skillcorner.edu@gmail.com>',
     ...mailOptions,
   });
 }
